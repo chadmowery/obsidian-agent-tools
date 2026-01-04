@@ -31,7 +31,7 @@ func main() {
 	w.Start(vaultPath)
 
 	// Start MCP Server
-	s, err := server.NewObsidianServer()
+	s, err := server.NewObsidianServer(vaultPath)
 	if err != nil {
 		log.Fatal(err)
 	}
