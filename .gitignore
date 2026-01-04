@@ -1,14 +1,10 @@
 # Binaries
-bd-bin
-beads-bin
-obsidian-mcp
 *.exe
 *.dll
 *.so
 *.dylib
 
 # Directories
-beads-repo/
 bin/
 dist/
 tmp/
