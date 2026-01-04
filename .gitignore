@@ -1,6 +1,7 @@
 # Binaries
 bd-bin
 beads-bin
+obsidian-mcp
 *.exe
 *.dll
 *.so
