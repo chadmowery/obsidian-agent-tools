@@ -1,0 +1,25 @@
+# Binaries
+bd-bin
+beads-bin
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Directories
+beads-repo/
+bin/
+dist/
+tmp/
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.idea/
+.vscode/
+
+# Vault (Personal data safety)
+obsidian/
