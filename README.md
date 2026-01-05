@@ -33,41 +33,87 @@ A lightweight Model Context Protocol (MCP) server that connects your AI agents t
 - **Stdio** - Standard MCP transport for local clients
 - **HTTP/SSE** - Remote access via HTTP server with Server-Sent Events
 
-## Installation
+## Quick Start
 
-### Prerequisites
-- Go 1.21 or later
-- (Optional) OpenAI API key for semantic search and AI features
-
-### Building from Source
+### Automated Setup (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/obsidian-agent.git
 cd obsidian-agent
 
-# Build the binary
-go build -o obsidian-mcp ./cmd/obsidian-mcp
+# Run setup script (installs dependencies, builds binaries, sets up Docker)
+./setup.sh
 
-# (Optional) Build for Raspberry Pi Zero
-GOOS=linux GOARCH=arm GOARM=6 go build -o obsidian-mcp-arm ./cmd/obsidian-mcp
+# Configure your vault path
+cp .env.example .env
+# Edit .env and set OBSIDIAN_VAULT_PATH=/path/to/your/vault
+
+# Index your vault
+source .env
+./bulk-index $OBSIDIAN_VAULT_PATH
+
+# Start the server
+./obsidian-mcp $OBSIDIAN_VAULT_PATH
 ```
+
+The setup script will:
+- ✅ Check prerequisites (Go, Docker, curl)
+- ✅ Install Go dependencies
+- ✅ Build all binaries
+- ✅ Set up Qdrant and Ollama containers
+- ✅ Pull the `nomic-embed-text` embedding model
+- ✅ Create example configuration
+
+### Manual Setup
+
+If you prefer to set up manually:
+
+```bash
+# Install dependencies
+go mod download
+
+# Build binaries
+go build -o obsidian-mcp ./cmd/obsidian-mcp
+go build -o obsidian-mcp-http ./cmd/obsidian-mcp-http
+go build -o bulk-index ./cmd/bulk-index
+
+# Start Qdrant
+docker run -d --name obsidian-qdrant \
+  -p 6333:6333 -p 6334:6334 \
+  -v $(pwd)/qdrant_storage:/qdrant/storage \
+  qdrant/qdrant
+
+# Start Ollama
+docker run -d --name ollama \
+  -p 11434:11434 \
+  -v ollama_data:/root/.ollama \
+  ollama/ollama
+
+# Pull embedding model
+docker exec ollama ollama pull nomic-embed-text
+```
+
 
 ### Raspberry Pi Zero Setup
 
-1. **Copy the binary to your Pi:**
+1. **Build for ARM:**
    ```bash
-   scp obsidian-mcp-arm pi@your-pi:/home/pi/
+   GOOS=linux GOARCH=arm GOARM=6 go build -o obsidian-mcp-arm ./cmd/obsidian-mcp
    ```
 
-2. **Make it executable:**
+2. **Copy to your Pi:**
    ```bash
+   scp obsidian-mcp-arm pi@your-pi:/home/pi/
    ssh pi@your-pi 'chmod +x /home/pi/obsidian-mcp-arm'
    ```
 
-3. **Set up your Obsidian vault:**
-   - Sync your vault to the Pi using Syncthing, rsync, or your preferred method
-   - Note the path to your vault (e.g., `/home/pi/obsidian`)
+3. **Set up Docker containers on Pi:**
+   ```bash
+   # SSH into your Pi and run the same Docker commands from Manual Setup
+   ssh pi@your-pi
+   # Follow the Docker setup steps for Qdrant and Ollama
+   ```
 
 4. **Create a systemd service (optional):**
    ```bash
@@ -77,19 +123,27 @@ GOOS=linux GOARCH=arm GOARM=6 go build -o obsidian-mcp-arm ./cmd/obsidian-mcp
    ```ini
    [Unit]
    Description=Obsidian MCP Server
-   After=network.target
+   After=network.target docker.service
+   Requires=docker.service
 
    [Service]
    Type=simple
    User=pi
    Environment="OBSIDIAN_VAULT_PATH=/home/pi/obsidian"
-   Environment="OPENAI_API_KEY=your-key-here"
+   Environment="USE_OLLAMA=true"
+   Environment="QDRANT_HOST=localhost"
    ExecStart=/home/pi/obsidian-mcp-arm
    Restart=on-failure
 
    [Install]
    WantedBy=multi-user.target
    ```
+   
+   ```bash
+   sudo systemctl enable obsidian-mcp
+   sudo systemctl start obsidian-mcp
+   ```
+
 
 ## Configuration
 
@@ -225,17 +279,93 @@ The agent will call `semantic_search` to find semantically similar notes.
 ## Architecture
 
 ```
-┌─────────────────┐     MCP/Stdio      ┌──────────────────┐
-│   AI Client     │◄──────────────────►│  Obsidian Agent  │
-│ (Gemini, Claude)│                    │   (MCP Server)   │
-└─────────────────┘                    └────────┬─────────┘
-                                                │
-                                                ▼
-                                       ┌──────────────────┐
-                                       │  Obsidian Vault  │
-                                       │   (Filesystem)   │
-                                       └──────────────────┘
+┌─────────────────┐     MCP/Stdio      ┌──────────────────────┐
+│   AI Client     │◄──────────────────►│  Obsidian Agent      │
+│ (Gemini, Claude)│      or HTTP/SSE   │   (MCP Server)       │
+└─────────────────┘                    └──────────┬───────────┘
+                                                  │
+                                    ┌─────────────┼─────────────┐
+                                    │             │             │
+                           ┌────────▼──────┐ ┌───▼────────┐ ┌──▼──────────┐
+                           │  Ollama       │ │  Qdrant    │ │  Obsidian   │
+                           │  Embeddings   │ │  Vectors   │ │  Vault      │
+                           │  (Local)      │ │  (Docker)  │ │  (Files)    │
+                           └───────────────┘ └────────────┘ └─────────────┘
 ```
+
+**Components:**
+- **MCP Server**: Exposes 15 tools via stdio or HTTP/SSE transport
+- **Ollama**: Local embedding generation (768-dim vectors, privacy-first)
+- **Qdrant**: Persistent vector storage for semantic search
+- **Vault**: Direct filesystem access to Obsidian markdown files
+
+## Troubleshooting
+
+### Docker Containers Not Running
+
+```bash
+# Check container status
+docker ps -a --filter name=obsidian-qdrant --filter name=ollama
+
+# Start containers if stopped
+docker start obsidian-qdrant ollama
+
+# View container logs
+docker logs obsidian-qdrant
+docker logs ollama
+```
+
+### Qdrant Connection Issues
+
+```bash
+# Verify Qdrant is healthy
+curl http://localhost:6333/healthz
+
+# Check collections
+curl http://localhost:6333/collections
+
+# Restart Qdrant
+docker restart obsidian-qdrant
+```
+
+### Ollama Model Issues
+
+```bash
+# List installed models
+docker exec ollama ollama list
+
+# Pull model if missing
+docker exec ollama ollama pull nomic-embed-text
+
+# Test embedding generation
+curl http://localhost:11434/api/embeddings -d '{
+  "model": "nomic-embed-text",
+  "prompt": "test"
+}'
+```
+
+### Indexing Failures
+
+If notes fail to index:
+- **Long notes**: The chunking system handles notes up to ~50,000 characters
+- **Empty files**: Empty markdown files are skipped automatically
+- **Special characters**: All Unicode characters are supported
+
+Check indexing logs for specific errors:
+```bash
+./bulk-index /path/to/vault 2>&1 | tee indexing.log
+```
+
+### MCP Client Connection Issues
+
+**Claude Desktop:**
+- Check `~/Library/Application Support/Claude/logs/mcp*.log`
+- Verify binary path is absolute in config
+- Ensure environment variables are set correctly
+
+**Gemini CLI:**
+- Run with `--verbose` flag to see MCP communication
+- Check that stdio transport is working: `echo '{"jsonrpc":"2.0","id":1,"method":"initialize"}' | ./obsidian-mcp /path/to/vault`
 
 ## Development
 
