@@ -303,6 +303,93 @@ mcp.WithString("question", mcp.Required(), mcp.Description("Natural language que
 		return mcp.NewToolResultText(answer), nil
 	})
 
+
+	// index_vault tool - Bulk index all notes in vault
+	s.AddTool(mcp.NewTool("index_vault",
+mcp.WithDescription("Index all notes in the vault for semantic search"),
+mcp.WithBoolean("force", mcp.Description("Force re-index of all notes (default: false)")),
+), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+if vecStore == nil {
+return mcp.NewToolResultError("vector store not initialized"), nil
+}
+
+arguments := request.GetArguments()
+		force := false
+		if f, ok := arguments["force"].(bool); ok {
+			force = f
+		}
+
+		// Find all markdown files in vault
+		var notes []string
+		err := filepath.Walk(vaultPath, func(path string, info os.FileInfo, err error) error {
+if err != nil {
+return err
+}
+if !info.IsDir() && strings.HasSuffix(path, ".md") {
+				relPath, _ := filepath.Rel(vaultPath, path)
+				notes = append(notes, relPath)
+			}
+			return nil
+		})
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan vault: %v", err)), nil
+		}
+
+		// Index each note
+		indexed := 0
+		skipped := 0
+		failed := 0
+
+		for _, notePath := range notes {
+			// Skip if already indexed (unless force)
+			if !force && vecStore.HasDocument(notePath) {
+				skipped++
+				continue
+			}
+
+			// Read note content
+			content, err := reader.ReadNote(notePath)
+			if err != nil {
+				failed++
+				continue
+			}
+
+			// Extract title from first heading or filename
+			title := filepath.Base(notePath)
+			lines := strings.Split(content, "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "# ") {
+					title = strings.TrimPrefix(line, "# ")
+					break
+				}
+			}
+
+			// Index the note
+			err = vecStore.IndexDocument(notePath, title, content)
+			if err != nil {
+				failed++
+				continue
+			}
+
+			indexed++
+		}
+
+		// Format response
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("Vault indexing complete:\n"))
+		sb.WriteString(fmt.Sprintf("- Total notes found: %d\n", len(notes)))
+		sb.WriteString(fmt.Sprintf("- Indexed: %d\n", indexed))
+		if skipped > 0 {
+			sb.WriteString(fmt.Sprintf("- Skipped (already indexed): %d\n", skipped))
+		}
+		if failed > 0 {
+			sb.WriteString(fmt.Sprintf("- Failed: %d\n", failed))
+		}
+		sb.WriteString(fmt.Sprintf("\nTotal documents in store: %d\n", vecStore.DocumentCount()))
+
+		return mcp.NewToolResultText(sb.String()), nil
+	})
 	// index_note tool (for manually indexing notes into vector store)
 	s.AddTool(mcp.NewTool("index_note",
 		mcp.WithDescription("Index a note into the vector store for semantic search"),
