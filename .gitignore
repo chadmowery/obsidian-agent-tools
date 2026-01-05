@@ -16,7 +16,10 @@ tmp/
 
 # Editor
 .idea/
-.vscode/
 
-# Vault (Personal data safety)
-obsidian/
+# Project Binaries
+obsidian-mcp
+obsidian-mcp-http
+obsidian-mcp-arm
+bulk-index
+test-search
