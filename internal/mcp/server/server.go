@@ -222,9 +222,10 @@ func NewObsidianServer(vaultPath string) (*ObsidianServer, error) {
 
 	// semantic_search tool
 	s.AddTool(mcp.NewTool("semantic_search",
-		mcp.WithDescription("Search notes using semantic similarity (requires OPENAI_API_KEY)"),
+		mcp.WithDescription("Search notes using semantic similarity with local embeddings (Ollama) or OpenAI"),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Natural language search query")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default: 5)")),
+		mcp.WithBoolean("with_content", mcp.Description("Include full note content in results (default: false)")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if vecStore == nil {
 			return mcp.NewToolResultError("vector store not initialized"), nil
@@ -241,18 +242,65 @@ func NewObsidianServer(vaultPath string) (*ObsidianServer, error) {
 			limit = int(l)
 		}
 
+		withContent := false
+		if wc, ok := arguments["with_content"].(bool); ok {
+			withContent = wc
+		}
+
 		results, err := vecStore.SemanticSearch(query, limit)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("semantic search failed: %v", err)), nil
 		}
 
-		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Found %d semantically similar notes:\n", len(results)))
-		for i, r := range results {
-			sb.WriteString(fmt.Sprintf("%d. %s (score: %.3f)\n", i+1, r.Document.ID, r.Similarity))
+		// Format results as structured JSON
+		formattedResults, err := FormatSearchResults(results, query, withContent, reader)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to format results: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(sb.String()), nil
+		return mcp.NewToolResultText(formattedResults), nil
+	})
+
+	// ask_vault tool - Natural language Q&A over vault
+	s.AddTool(mcp.NewTool("ask_vault",
+mcp.WithDescription("Ask a natural language question about your vault using RAG (Retrieval-Augmented Generation)"),
+mcp.WithString("question", mcp.Required(), mcp.Description("Natural language question to ask")),
+		mcp.WithNumber("limit", mcp.Description("Number of source notes to retrieve (default: 5)")),
+		mcp.WithBoolean("include_snippets", mcp.Description("Include text snippets from sources (default: true)")),
+	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if vecStore == nil {
+			return mcp.NewToolResultError("vector store not initialized"), nil
+		}
+
+		arguments := request.GetArguments()
+		question, ok := arguments["question"].(string)
+		if !ok {
+			return mcp.NewToolResultError("question parameter required"), nil
+		}
+
+		limit := 5
+		if l, ok := arguments["limit"].(float64); ok {
+			limit = int(l)
+		}
+
+		includeSnippets := true
+		if is, ok := arguments["include_snippets"].(bool); ok {
+			includeSnippets = is
+		}
+
+		// Perform semantic search
+		results, err := vecStore.SemanticSearch(question, limit)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semantic search failed: %v", err)), nil
+		}
+
+		// Retrieve full context for top results
+		contexts := RetrieveContext(results, reader, limit)
+
+		// Format answer with citations
+		answer := FormatAnswer(question, contexts, includeSnippets)
+
+		return mcp.NewToolResultText(answer), nil
 	})
 
 	// index_note tool (for manually indexing notes into vector store)
