@@ -21,12 +21,12 @@ type Document struct {
 type Store struct {
 	path      string              // Path to the store file
 	documents map[string]Document // In-memory document index
-	embedder  *Embedder
+	embedder  EmbedderInterface
 	mu        sync.RWMutex
 }
 
 // NewStore creates a new vector store at the given path
-func NewStore(storePath string, embedder *Embedder) (*Store, error) {
+func NewStore(storePath string, embedder EmbedderInterface) (*Store, error) {
 	s := &Store{
 		path:      storePath,
 		documents: make(map[string]Document),

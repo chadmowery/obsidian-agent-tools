@@ -19,7 +19,7 @@ type ObsidianServer struct {
 	*server.MCPServer
 	reader      *vault.Reader
 	writer      *vault.Writer
-	vectorStore *vectorstore.Store
+	vectorStore vectorstore.VectorStore
 }
 
 func NewObsidianServer(vaultPath string) (*ObsidianServer, error) {
@@ -27,10 +27,15 @@ func NewObsidianServer(vaultPath string) (*ObsidianServer, error) {
 	reader := vault.NewReader(vaultPath)
 	writer := vault.NewWriter(vaultPath)
 
-	// Initialize vector store
+	// Initialize vector store with factory
 	embedder := vectorstore.NewEmbedder(vectorstore.EmbedderConfig{})
 	storePath := filepath.Join(vaultPath, ".obsidian-agent", "vectors.json")
-	vecStore, err := vectorstore.NewStore(storePath, embedder)
+
+	vecStore, err := vectorstore.NewVectorStore(vectorstore.StoreConfig{
+		StorePath:    storePath,
+		Embedder:     embedder,
+		PreferQdrant: true, // Try Qdrant first, fallback to JSON
+	})
 	if err != nil {
 		// Non-fatal: just log and continue without vector store
 		fmt.Fprintf(os.Stderr, "Warning: failed to initialize vector store: %v\n", err)

@@ -91,6 +91,43 @@ GOOS=linux GOARCH=arm GOARM=6 go build -o obsidian-mcp-arm ./cmd/obsidian-mcp
 |----------|-------------|---------|
 | `OBSIDIAN_VAULT_PATH` | Path to your Obsidian vault | Required |
 | `OPENAI_API_KEY` | OpenAI API key for semantic search and AI features | Optional |
+| `QDRANT_HOST` | Qdrant server host | `localhost` |
+| `QDRANT_PORT` | Qdrant gRPC port | `6334` |
+| `QDRANT_API_KEY` | Qdrant API key (for Qdrant Cloud) | Optional |
+| `QDRANT_USE_TLS` | Enable TLS for Qdrant connection | `false` |
+
+### Vector Storage
+
+The agent supports two vector storage backends for semantic search:
+
+#### Qdrant (Recommended)
+
+Qdrant provides persistent, scalable vector storage that survives server restarts.
+
+**Local Docker Setup:**
+```bash
+# Start Qdrant locally
+docker run -p 6333:6333 -p 6334:6334 \
+  -v $(pwd)/qdrant_storage:/qdrant/storage \
+  qdrant/qdrant
+
+# Set environment variables
+export QDRANT_HOST=localhost
+export QDRANT_PORT=6334
+```
+
+**Qdrant Cloud Setup:**
+```bash
+# Get your cluster URL and API key from https://cloud.qdrant.io
+export QDRANT_HOST=xyz-example.eu-central.aws.cloud.qdrant.io
+export QDRANT_PORT=6334
+export QDRANT_API_KEY=your-api-key-here
+export QDRANT_USE_TLS=true
+```
+
+#### JSON Store (Fallback)
+
+If Qdrant is not configured or unavailable, the agent automatically falls back to a JSON-based vector store. This is suitable for development but doesn't persist across restarts as efficiently.
 
 ## MCP Client Configuration
 

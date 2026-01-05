@@ -9,7 +9,8 @@ import (
 	"os"
 )
 
-// Embedder generates vector embeddings for text
+// Embedder generates vector embeddings for text using OpenAI
+// Implements EmbedderInterface
 type Embedder struct {
 	apiEndpoint string
 	apiKey      string
