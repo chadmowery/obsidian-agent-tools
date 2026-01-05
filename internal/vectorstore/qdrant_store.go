@@ -117,64 +117,91 @@ func (s *QdrantStore) ensureCollection() error {
 }
 
 // IndexDocument adds or updates a document in the store
+// Automatically chunks long documents to fit within embedding context limits
 func (s *QdrantStore) IndexDocument(id, title, content string) error {
 	if s.embedder == nil || !s.embedder.IsConfigured() {
 		return fmt.Errorf("embedder not configured")
 	}
 
-	// Generate embedding
-	embedding, err := s.embedder.Embed(content)
-	if err != nil {
-		return fmt.Errorf("failed to generate embedding: %w", err)
+	// First, remove any existing chunks for this document
+	if err := s.RemoveDocument(id); err != nil {
+		// Non-fatal, just log
+		fmt.Fprintf(os.Stderr, "Warning: failed to remove existing document: %v\n", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Chunk the content
+	chunks := ChunkText(content, id, ChunkConfig{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(len(chunks)*30)*time.Second)
 	defer cancel()
 
-	// Create point with payload
-	// Use hash of ID as UUID since file paths can contain invalid characters
-	idHash := sha256.Sum256([]byte(id))
-	idUUID := hex.EncodeToString(idHash[:16]) // Use first 16 bytes as UUID
+	var points []*qdrant.PointStruct
 
-	point := &qdrant.PointStruct{
-		Id:      qdrant.NewID(idUUID),
-		Vectors: qdrant.NewVectors(embedding...),
-		Payload: qdrant.NewValueMap(map[string]any{
-			"id":      id,
-			"title":   title,
-			"content": content,
-		}),
+	for _, chunk := range chunks {
+		// Generate embedding for this chunk
+		embedding, err := s.embedder.Embed(chunk.Text)
+		if err != nil {
+			return fmt.Errorf("failed to generate embedding for chunk %d: %w", chunk.Index, err)
+		}
+
+		// Create unique ID for this chunk
+		chunkID := fmt.Sprintf("%s#chunk%d", id, chunk.Index)
+		idHash := sha256.Sum256([]byte(chunkID))
+		idUUID := hex.EncodeToString(idHash[:16])
+
+		point := &qdrant.PointStruct{
+			Id:      qdrant.NewID(idUUID),
+			Vectors: qdrant.NewVectors(embedding...),
+			Payload: qdrant.NewValueMap(map[string]any{
+				"id":           id,
+				"title":        title,
+				"content":      chunk.Text,
+				"chunk_index":  chunk.Index,
+				"total_chunks": chunk.TotalChunks,
+				"is_chunked":   chunk.TotalChunks > 1,
+			}),
+		}
+
+		points = append(points, point)
 	}
 
-	// Upsert point
-	_, err = s.client.Upsert(ctx, &qdrant.UpsertPoints{
+	// Upsert all chunks
+	_, err := s.client.Upsert(ctx, &qdrant.UpsertPoints{
 		CollectionName: s.collectionName,
-		Points:         []*qdrant.PointStruct{point},
+		Points:         points,
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to upsert point: %w", err)
+		return fmt.Errorf("failed to upsert points: %w", err)
 	}
 
 	return nil
 }
 
-// RemoveDocument removes a document from the store
+// RemoveDocument removes a document and all its chunks from the store
 func (s *QdrantStore) RemoveDocument(id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Use hash of ID as UUID
-	idHash := sha256.Sum256([]byte(id))
-	idUUID := hex.EncodeToString(idHash[:16])
-
+	// Delete by filter (all points with matching parent ID)
 	_, err := s.client.Delete(ctx, &qdrant.DeletePoints{
 		CollectionName: s.collectionName,
 		Points: &qdrant.PointsSelector{
-			PointsSelectorOneOf: &qdrant.PointsSelector_Points{
-				Points: &qdrant.PointsIdsList{
-					Ids: []*qdrant.PointId{
-						qdrant.NewID(idUUID),
+			PointsSelectorOneOf: &qdrant.PointsSelector_Filter{
+				Filter: &qdrant.Filter{
+					Must: []*qdrant.Condition{
+						{
+							ConditionOneOf: &qdrant.Condition_Field{
+								Field: &qdrant.FieldCondition{
+									Key: "id",
+									Match: &qdrant.Match{
+										MatchValue: &qdrant.Match_Keyword{
+											Keyword: id,
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -182,13 +209,14 @@ func (s *QdrantStore) RemoveDocument(id string) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to delete point: %w", err)
+		return fmt.Errorf("failed to delete document: %w", err)
 	}
 
 	return nil
 }
 
 // SemanticSearch finds documents similar to the query
+// Automatically aggregates chunks from the same document
 func (s *QdrantStore) SemanticSearch(query string, limit int) ([]SearchResult, error) {
 	if s.embedder == nil || !s.embedder.IsConfigured() {
 		return nil, fmt.Errorf("semantic search requires configured embedder")
@@ -203,11 +231,12 @@ func (s *QdrantStore) SemanticSearch(query string, limit int) ([]SearchResult, e
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Query Qdrant
+	// Query Qdrant with higher limit to account for chunks
+	searchLimit := uint64(limit * 3) // Get more results to aggregate chunks
 	searchResult, err := s.client.Query(ctx, &qdrant.QueryPoints{
 		CollectionName: s.collectionName,
 		Query:          qdrant.NewQuery(queryEmb...),
-		Limit:          qdrant.PtrOf(uint64(limit)),
+		Limit:          qdrant.PtrOf(searchLimit),
 		WithPayload:    qdrant.NewWithPayload(true),
 	})
 
@@ -215,23 +244,56 @@ func (s *QdrantStore) SemanticSearch(query string, limit int) ([]SearchResult, e
 		return nil, fmt.Errorf("failed to query Qdrant: %w", err)
 	}
 
-	// Convert results
-	var results []SearchResult
+	// Aggregate chunks by document ID
+	docMap := make(map[string]*SearchResult)
+
 	for _, point := range searchResult {
 		payload := point.GetPayload()
 
 		id := extractStringFromValue(payload["id"])
 		title := extractStringFromValue(payload["title"])
 		content := extractStringFromValue(payload["content"])
+		score := point.GetScore()
 
-		results = append(results, SearchResult{
-			Document: Document{
-				ID:      id,
-				Title:   title,
-				Content: content,
-			},
-			Similarity: point.GetScore(),
-		})
+		// Check if we've seen this document before
+		if existing, ok := docMap[id]; ok {
+			// Keep the highest similarity score
+			if score > existing.Similarity {
+				existing.Similarity = score
+			}
+			// Append chunk content
+			existing.Document.Content += "\n\n" + content
+		} else {
+			// New document
+			docMap[id] = &SearchResult{
+				Document: Document{
+					ID:      id,
+					Title:   title,
+					Content: content,
+				},
+				Similarity: score,
+			}
+		}
+	}
+
+	// Convert map to sorted slice
+	var results []SearchResult
+	for _, result := range docMap {
+		results = append(results, *result)
+	}
+
+	// Sort by similarity (descending)
+	for i := 0; i < len(results); i++ {
+		for j := i + 1; j < len(results); j++ {
+			if results[j].Similarity > results[i].Similarity {
+				results[i], results[j] = results[j], results[i]
+			}
+		}
+	}
+
+	// Limit results
+	if len(results) > limit {
+		results = results[:limit]
 	}
 
 	return results, nil

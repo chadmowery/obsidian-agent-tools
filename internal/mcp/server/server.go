@@ -263,8 +263,8 @@ func NewObsidianServer(vaultPath string) (*ObsidianServer, error) {
 
 	// ask_vault tool - Natural language Q&A over vault
 	s.AddTool(mcp.NewTool("ask_vault",
-mcp.WithDescription("Ask a natural language question about your vault using RAG (Retrieval-Augmented Generation)"),
-mcp.WithString("question", mcp.Required(), mcp.Description("Natural language question to ask")),
+		mcp.WithDescription("Ask a natural language question about your vault using RAG (Retrieval-Augmented Generation)"),
+		mcp.WithString("question", mcp.Required(), mcp.Description("Natural language question to ask")),
 		mcp.WithNumber("limit", mcp.Description("Number of source notes to retrieve (default: 5)")),
 		mcp.WithBoolean("include_snippets", mcp.Description("Include text snippets from sources (default: true)")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -303,17 +303,16 @@ mcp.WithString("question", mcp.Required(), mcp.Description("Natural language que
 		return mcp.NewToolResultText(answer), nil
 	})
 
-
 	// index_vault tool - Bulk index all notes in vault
 	s.AddTool(mcp.NewTool("index_vault",
-mcp.WithDescription("Index all notes in the vault for semantic search"),
-mcp.WithBoolean("force", mcp.Description("Force re-index of all notes (default: false)")),
-), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-if vecStore == nil {
-return mcp.NewToolResultError("vector store not initialized"), nil
-}
+		mcp.WithDescription("Index all notes in the vault for semantic search"),
+		mcp.WithBoolean("force", mcp.Description("Force re-index of all notes (default: false)")),
+	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if vecStore == nil {
+			return mcp.NewToolResultError("vector store not initialized"), nil
+		}
 
-arguments := request.GetArguments()
+		arguments := request.GetArguments()
 		force := false
 		if f, ok := arguments["force"].(bool); ok {
 			force = f
@@ -322,10 +321,10 @@ arguments := request.GetArguments()
 		// Find all markdown files in vault
 		var notes []string
 		err := filepath.Walk(vaultPath, func(path string, info os.FileInfo, err error) error {
-if err != nil {
-return err
-}
-if !info.IsDir() && strings.HasSuffix(path, ".md") {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() && strings.HasSuffix(path, ".md") {
 				relPath, _ := filepath.Rel(vaultPath, path)
 				notes = append(notes, relPath)
 			}
@@ -515,4 +514,9 @@ if !info.IsDir() && strings.HasSuffix(path, ".md") {
 
 func (s *ObsidianServer) Serve() error {
 	return server.ServeStdio(s.MCPServer)
+}
+
+// GetVectorStore returns the vector store instance
+func (s *ObsidianServer) GetVectorStore() vectorstore.VectorStore {
+	return s.vectorStore
 }

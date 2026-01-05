@@ -16,14 +16,22 @@ A lightweight Model Context Protocol (MCP) server that connects your AI agents t
 - **`update_frontmatter`** - Update a note's YAML frontmatter
 - **`link_notes`** - Add a wikilink from one note to another
 
-### 🔍 Semantic Search
-- **`semantic_search`** - Find notes by meaning using embeddings
-- **`index_note`** - Add a note to the vector store
+### 🔍 Semantic Search & RAG
+- **`semantic_search`** - Find notes by meaning using local embeddings (Ollama) or OpenAI
+- **`ask_vault`** - Natural language Q&A over your vault with RAG
+- **`index_vault`** - Bulk index all notes for semantic search
+- **`index_note`** - Add a single note to the vector store
+- **Auto-Indexing** - Automatically index notes as they're created/modified (file watcher)
+- **Chunking** - Handles long documents by splitting into chunks (100% indexing success)
 
 ### 🌱 Gardener Tools
 - **`find_orphans`** - Find notes with no links
 - **`vault_stats`** - Get link structure statistics
 - **`suggest_tags`** - AI-powered tag suggestions
+
+### 🌐 Transport Options
+- **Stdio** - Standard MCP transport for local clients
+- **HTTP/SSE** - Remote access via HTTP server with Server-Sent Events
 
 ## Installation
 
@@ -91,10 +99,15 @@ GOOS=linux GOARCH=arm GOARM=6 go build -o obsidian-mcp-arm ./cmd/obsidian-mcp
 |----------|-------------|---------|
 | `OBSIDIAN_VAULT_PATH` | Path to your Obsidian vault | Required |
 | `OPENAI_API_KEY` | OpenAI API key for semantic search and AI features | Optional |
+| `USE_OLLAMA` | Use Ollama for local embeddings instead of OpenAI | `false` |
+| `OLLAMA_ENDPOINT` | Ollama API endpoint | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Ollama embedding model | `nomic-embed-text` |
 | `QDRANT_HOST` | Qdrant server host | `localhost` |
 | `QDRANT_PORT` | Qdrant gRPC port | `6334` |
 | `QDRANT_API_KEY` | Qdrant API key (for Qdrant Cloud) | Optional |
 | `QDRANT_USE_TLS` | Enable TLS for Qdrant connection | `false` |
+| `ENABLE_AUTO_INDEX` | Enable automatic file watcher indexing | `true` |
+| `MCP_HTTP_PORT` | HTTP server port (for obsidian-mcp-http) | `8080` |
 
 ### Vector Storage
 
