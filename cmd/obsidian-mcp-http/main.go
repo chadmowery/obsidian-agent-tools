@@ -14,9 +14,14 @@ import (
 	"obsidian-agent/internal/mcp/server"
 	"obsidian-agent/internal/vault"
 	"obsidian-agent/internal/watcher"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file if it exists
+	godotenv.Load()
+
 	fmt.Println("Obsidian MCP HTTP Server starting...")
 
 	if len(os.Args) < 2 {

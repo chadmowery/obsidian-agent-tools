@@ -76,10 +76,19 @@ func NewQdrantStore(config QdrantConfig, embedder EmbedderInterface) (*QdrantSto
 	return store, nil
 }
 
-// ensureCollection creates the collection if it doesn't exist
+// ensureCollection creates the collection if it doesn't exist, or recreates it if dimensions mismatch
 func (s *QdrantStore) ensureCollection() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Determine expected vector size from embedder
+	expectedSize := uint64(1536) // Default for OpenAI
+	if s.embedder != nil && s.embedder.IsConfigured() {
+		testEmb, err := s.embedder.Embed("test")
+		if err == nil && len(testEmb) > 0 {
+			expectedSize = uint64(len(testEmb))
+		}
+	}
 
 	// Check if collection exists
 	exists, err := s.client.CollectionExists(ctx, s.collectionName)
@@ -88,23 +97,39 @@ func (s *QdrantStore) ensureCollection() error {
 	}
 
 	if exists {
-		return nil
+		// Check if dimensions match
+		info, err := s.client.GetCollectionInfo(ctx, s.collectionName)
+		if err != nil {
+			return fmt.Errorf("failed to get collection info: %w", err)
+		}
+
+		// Use getters to safely access nested proto fields
+		// Note: GetVectorsConfig() returns the config, GetParams() returns the single vector params (if configured that way)
+		// If it was configured as a map (named vectors), GetParams() might be nil or empty, and Size would be 0.
+		// In that case, we'll likely recreate it, which is fine as we want a single unnamed vector configuration.
+		currentSize := info.GetConfig().GetParams().GetVectorsConfig().GetParams().GetSize()
+
+		if currentSize != expectedSize {
+			fmt.Fprintf(os.Stderr, "⚠ Warning: Collection '%s' has dimension %d, but embedder uses %d.\n",
+				s.collectionName, currentSize, expectedSize)
+			fmt.Fprintf(os.Stderr, "↺ Recreating collection to match new embedder config...\n")
+
+			if err := s.client.DeleteCollection(ctx, s.collectionName); err != nil {
+				return fmt.Errorf("failed to delete mismatched collection: %w", err)
+			}
+			exists = false
+		}
 	}
 
-	// Determine vector size from embedder by generating a test embedding
-	vectorSize := uint64(1536) // Default for OpenAI
-	if s.embedder != nil && s.embedder.IsConfigured() {
-		testEmb, err := s.embedder.Embed("test")
-		if err == nil && len(testEmb) > 0 {
-			vectorSize = uint64(len(testEmb))
-		}
+	if exists {
+		return nil
 	}
 
 	// Create collection
 	err = s.client.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: s.collectionName,
 		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-			Size:     vectorSize,
+			Size:     expectedSize,
 			Distance: qdrant.Distance_Cosine,
 		}),
 	})
@@ -131,6 +156,10 @@ func (s *QdrantStore) IndexDocument(id, title, content string) error {
 
 	// Chunk the content
 	chunks := ChunkText(content, id, ChunkConfig{})
+	if len(chunks) == 0 {
+		// Nothing to index (empty file)
+		return nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(len(chunks)*30)*time.Second)
 	defer cancel()

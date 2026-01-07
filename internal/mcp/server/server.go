@@ -28,7 +28,7 @@ func NewObsidianServer(vaultPath string) (*ObsidianServer, error) {
 	writer := vault.NewWriter(vaultPath)
 
 	// Initialize vector store with factory
-	embedder := vectorstore.NewEmbedder(vectorstore.EmbedderConfig{})
+	embedder := vectorstore.NewEmbedderAuto()
 	storePath := filepath.Join(vaultPath, ".obsidian-agent", "vectors.json")
 
 	vecStore, err := vectorstore.NewVectorStore(vectorstore.StoreConfig{

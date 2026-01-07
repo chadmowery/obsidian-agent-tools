@@ -34,6 +34,11 @@ func ChunkText(text string, parentID string, config ChunkConfig) []Chunk {
 		config.OverlapSize = 600
 	}
 
+	// Skip empty or whitespace-only text
+	if strings.TrimSpace(text) == "" {
+		return nil
+	}
+
 	// If text fits in one chunk, return it as-is
 	if len(text) <= config.MaxChunkSize {
 		return []Chunk{{
@@ -69,15 +74,18 @@ func ChunkText(text string, parentID string, config ChunkConfig) []Chunk {
 		})
 
 		// Move start position with overlap
-		start = end - config.OverlapSize
-		if start < 0 {
-			start = 0
+		newStart := end - config.OverlapSize
+		if newStart < 0 {
+			newStart = 0
 		}
 
-		// Prevent infinite loop if overlap is too large
-		if start <= chunks[len(chunks)-1].Index && len(chunks) > 1 {
-			start = end
+		// Prevent infinite loop: ensure we always move forward
+		// If the chunk is smaller than the overlap, newStart could be <= start
+		if newStart <= start {
+			newStart = end // Zero overlap for this chunk to force progress
 		}
+
+		start = newStart
 	}
 
 	// Set total chunks for all chunks

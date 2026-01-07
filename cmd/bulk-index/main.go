@@ -9,9 +9,14 @@ import (
 
 	"obsidian-agent/internal/vault"
 	"obsidian-agent/internal/vectorstore"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file if it exists
+	godotenv.Load()
+
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: bulk-index <vault-path>")
 		os.Exit(1)

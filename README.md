@@ -81,7 +81,7 @@ go build -o bulk-index ./cmd/bulk-index
 # Start Qdrant
 docker run -d --name obsidian-qdrant \
   -p 6333:6333 -p 6334:6334 \
-  -v $(pwd)/qdrant_storage:/qdrant/storage \
+  -v obsidian_qdrant_data:/qdrant/storage \
   qdrant/qdrant
 
 # Start Ollama
@@ -112,7 +112,7 @@ docker exec ollama ollama pull nomic-embed-text
    ```bash
    # SSH into your Pi and run the same Docker commands from Manual Setup
    ssh pi@your-pi
-   # Follow the Docker setup steps for Qdrant and Ollama
+   # Follow the Docker setup steps for Qdrant (using volume) and Ollama
    ```
 
 4. **Create a systemd service (optional):**
@@ -175,7 +175,7 @@ Qdrant provides persistent, scalable vector storage that survives server restart
 ```bash
 # Start Qdrant locally
 docker run -p 6333:6333 -p 6334:6334 \
-  -v $(pwd)/qdrant_storage:/qdrant/storage \
+  -v obsidian_qdrant_data:/qdrant/storage \
   qdrant/qdrant
 
 # Set environment variables
@@ -223,15 +223,18 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "obsidian": {
-      "command": "/path/to/obsidian-mcp",
+      "command": "/absolute/path/to/obsidian-mcp",
+      "args": ["/absolute/path/to/your/vault"],
       "env": {
-        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault",
-        "OPENAI_API_KEY": "sk-..."
+        "USE_OLLAMA": "true"
       }
     }
   }
 }
 ```
+
+> [!NOTE]
+> Ensure you use absolute paths for both the command and the vault argument. The server will automatically look for the `.env` file in the same directory as the executable.
 
 ### Remote Connection (SSH)
 

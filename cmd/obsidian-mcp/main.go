@@ -12,9 +12,26 @@ import (
 	"obsidian-agent/internal/mcp/server"
 	"obsidian-agent/internal/vault"
 	"obsidian-agent/internal/watcher"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file
+	// First try to load from the directory where the executable is located
+	execPath, err := os.Executable()
+	if err == nil {
+		execDir := filepath.Dir(execPath)
+		envPath := filepath.Join(execDir, ".env")
+		if err := godotenv.Load(envPath); err != nil {
+			// If not found in exec dir, try loading from current working directory
+			godotenv.Load()
+		}
+	} else {
+		// Fallback to current working directory
+		godotenv.Load()
+	}
+
 	// Configure logging to stderr (MCP servers must only write JSON-RPC to stdout)
 	log.SetOutput(os.Stderr)
 

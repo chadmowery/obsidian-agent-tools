@@ -97,7 +97,7 @@ else
         --name obsidian-qdrant \
         -p 6333:6333 \
         -p 6334:6334 \
-        -v "$(pwd)/qdrant_storage:/qdrant/storage" \
+        -v "obsidian_qdrant_data:/qdrant/storage" \
         qdrant/qdrant
     print_status "Qdrant container created and started"
 fi
