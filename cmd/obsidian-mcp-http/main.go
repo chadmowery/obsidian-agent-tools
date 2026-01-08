@@ -10,10 +10,11 @@ import (
 	"strings"
 	"syscall"
 
-	"obsidian-agent/internal/mcp"
 	"obsidian-agent/internal/mcp/server"
 	"obsidian-agent/internal/vault"
 	"obsidian-agent/internal/watcher"
+
+	libServer "github.com/mark3labs/mcp-go/server"
 
 	"github.com/joho/godotenv"
 )
@@ -99,12 +100,38 @@ func main() {
 	}
 
 	// Create SSE server
-	sseServer := mcp.NewSSEServer(mcpServer.MCPServer)
+	sseServer := libServer.NewSSEServer(mcpServer.MCPServer, libServer.WithSSEEndpoint("http://localhost:"+port+"/mcp/sse"))
+
+	// Set up router
+	mux := http.NewServeMux()
+
+	// Add a simple logging middleware
+	logRequest := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("📥 %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	mux.HandleFunc("/mcp/sse", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("📥 %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+		if r.Method == http.MethodPost {
+			sseServer.MessageHandler().ServeHTTP(w, r)
+		} else {
+			sseServer.SSEHandler().ServeHTTP(w, r)
+		}
+	})
+	mux.Handle("/message", logRequest(sseServer.MessageHandler()))
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
 
 	// Set up HTTP server
 	httpServer := &http.Server{
 		Addr:    ":" + port,
-		Handler: sseServer,
+		Handler: mux,
 	}
 
 	// Set up graceful shutdown

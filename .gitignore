@@ -7,6 +7,9 @@
 *.so
 *.dylib
 
+# Logs
+*.log
+
 # Directories
 bin/
 dist/
