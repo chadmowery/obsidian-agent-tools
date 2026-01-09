@@ -100,7 +100,10 @@ func main() {
 	}
 
 	// Create SSE server
-	sseServer := libServer.NewSSEServer(mcpServer.MCPServer, libServer.WithSSEEndpoint("http://localhost:"+port+"/mcp/sse"))
+	sseServer := libServer.NewSSEServer(mcpServer.MCPServer,
+		libServer.WithSSEEndpoint("http://localhost:"+port+"/mcp/sse"),
+		libServer.WithMessageEndpoint("/mcp/message"),
+	)
 
 	// Set up router
 	mux := http.NewServeMux()
@@ -121,7 +124,7 @@ func main() {
 			sseServer.SSEHandler().ServeHTTP(w, r)
 		}
 	})
-	mux.Handle("/message", logRequest(sseServer.MessageHandler()))
+	mux.Handle("/mcp/message", logRequest(sseServer.MessageHandler()))
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
