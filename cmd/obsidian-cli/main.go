@@ -33,6 +33,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  tags                    List all tags\n")
 		fmt.Fprintf(os.Stderr, "  stats                   Show vault statistics\n")
 		fmt.Fprintf(os.Stderr, "  link <source> <target>  Link two notes\n")
+		fmt.Fprintf(os.Stderr, "  watch                   Watch vault for changes and auto-index\n")
 	}
 	flag.Parse()
 
@@ -85,6 +86,8 @@ func main() {
 		cmdErr = commands.RunStats(deps, cmdArgs)
 	case "link":
 		cmdErr = commands.RunLink(deps, cmdArgs)
+	case "watch":
+		cmdErr = commands.RunWatch(deps, cmdArgs)
 	default:
 		fatal(*jsonOutput, "Unknown command: %s", cmd)
 	}
