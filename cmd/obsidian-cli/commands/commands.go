@@ -11,6 +11,7 @@ import (
 	"obsidian-agent/internal/llm"
 	"obsidian-agent/internal/vault"
 	"obsidian-agent/internal/vectorstore"
+	"obsidian-agent/internal/watcher"
 )
 
 type Dependencies struct {
@@ -275,4 +276,92 @@ func RunLink(deps *Dependencies, args []string) error {
 		fmt.Printf("Linked '%s' to '%s'\n", source, target)
 	}
 	return nil
+}
+
+// RunWatch implements US-004: File Watcher
+func RunWatch(deps *Dependencies, args []string) error {
+	// 1. Initialize Vector Store
+	emb := vectorstore.NewEmbedderAuto()
+	config := vectorstore.QdrantConfig{
+		Host: os.Getenv("QDRANT_HOST"),
+		Port: getEnvInt("QDRANT_PORT", 6334),
+	}
+	store, err := vectorstore.NewQdrantStore(config, emb)
+	if err != nil {
+		return fmt.Errorf("failed to connect to vector store: %w", err)
+	}
+	// Verify connection
+	if count := store.DocumentCount(); count >= 0 {
+		fmt.Printf("✓ Connected to vector store (Documents: %d)\n", count)
+	}
+
+	// 2. Initialize Watcher
+	w, err := watcher.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to initialize watcher: %w", err)
+	}
+	defer w.Close()
+
+	// 3. Set Callback
+	reader := vault.NewReader(deps.VaultPath)
+	w.SetCallback(func(path string, op watcher.FileOp) {
+		relPath, err := filepath.Rel(deps.VaultPath, path)
+		if err != nil {
+			fmt.Printf("⚠️  Failed to get relative path: %v\n", err)
+			return
+		}
+
+		switch op {
+		case watcher.OpCreate:
+			fmt.Printf("📝 New note detected: %s\n", relPath)
+			indexNote(store, reader, relPath)
+
+		case watcher.OpModify:
+			fmt.Printf("✏️  Modified note detected: %s\n", relPath)
+			indexNote(store, reader, relPath)
+
+		case watcher.OpDelete:
+			fmt.Printf("🗑️  Deleted note detected: %s\n", relPath)
+			if err := store.RemoveDocument(relPath); err != nil {
+				fmt.Printf("⚠️  Failed to remove from index: %v\n", err)
+			} else {
+				fmt.Printf("✓ Removed from index: %s\n", relPath)
+			}
+		}
+	})
+
+	// 4. Start Watching
+	if err := w.Start(deps.VaultPath); err != nil {
+		return fmt.Errorf("failed to start watcher: %w", err)
+	}
+
+	// 5. Block forever
+	select {}
+}
+
+// indexNote indexes a single note into the vector store
+func indexNote(vecStore interface {
+	IndexDocument(id, title, content string) error
+}, reader *vault.Reader, path string) {
+	content, err := reader.ReadNote(path)
+	if err != nil {
+		fmt.Printf("⚠️  Failed to read note: %v\n", err)
+		return
+	}
+
+	// Extract title from first heading or filename
+	title := filepath.Base(path)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# ") {
+			title = strings.TrimPrefix(line, "# ")
+			break
+		}
+	}
+
+	if err := vecStore.IndexDocument(path, title, content); err != nil {
+		fmt.Printf("⚠️  Failed to index: %v\n", err)
+	} else {
+		fmt.Printf("✓ Indexed: %s\n", path)
+	}
 }
