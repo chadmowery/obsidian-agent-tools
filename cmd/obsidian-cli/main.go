@@ -34,6 +34,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  stats                   Show vault statistics\n")
 		fmt.Fprintf(os.Stderr, "  link <source> <target>  Link two notes\n")
 		fmt.Fprintf(os.Stderr, "  watch                   Watch vault for changes and auto-index\n")
+		fmt.Fprintf(os.Stderr, "  index                   Bulk index all notes\n")
 	}
 	flag.Parse()
 
@@ -88,6 +89,8 @@ func main() {
 		cmdErr = commands.RunLink(deps, cmdArgs)
 	case "watch":
 		cmdErr = commands.RunWatch(deps, cmdArgs)
+	case "index":
+		cmdErr = commands.RunIndex(deps, cmdArgs)
 	default:
 		fatal(*jsonOutput, "Unknown command: %s", cmd)
 	}

@@ -365,3 +365,55 @@ func indexNote(vecStore interface {
 		fmt.Printf("✓ Indexed: %s\n", path)
 	}
 }
+
+// RunIndex implements Bulk Index Command
+func RunIndex(deps *Dependencies, args []string) error {
+	// 1. Initialize Vector Store
+	emb := vectorstore.NewEmbedderAuto()
+	config := vectorstore.QdrantConfig{
+		Host: os.Getenv("QDRANT_HOST"),
+		Port: getEnvInt("QDRANT_PORT", 6334),
+	}
+	store, err := vectorstore.NewQdrantStore(config, emb)
+	if err != nil {
+		return fmt.Errorf("failed to connect to vector store: %w", err)
+	}
+	// Verify connection
+	if count := store.DocumentCount(); count >= 0 {
+		fmt.Printf("✓ Connected to vector store (Documents: %d)\n", count)
+	}
+
+	reader := vault.NewReader(deps.VaultPath)
+	count := 0
+
+	fmt.Printf("📂 Scanning vault: %s\n", deps.VaultPath)
+
+	err = filepath.Walk(deps.VaultPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+
+		// Skip hidden files/dirs
+		if strings.HasPrefix(filepath.Base(path), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if !info.IsDir() && strings.HasSuffix(path, ".md") {
+			relPath, _ := filepath.Rel(deps.VaultPath, path)
+			fmt.Printf("Indexing: %s\n", relPath)
+			indexNote(store, reader, relPath)
+			count++
+		}
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("✨ Bulk indexing complete. Indexed %d notes.\n", count)
+	return nil
+}
