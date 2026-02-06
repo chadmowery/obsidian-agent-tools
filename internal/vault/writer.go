@@ -186,3 +186,41 @@ func (w *Writer) LinkNotes(source, target string) error {
 
 	return nil
 }
+
+// AppendToNote appends text to a note, creating it if it doesn't exist
+func (w *Writer) AppendToNote(path, text string) error {
+	// Ensure .md extension
+	if !strings.HasSuffix(path, ".md") {
+		path = path + ".md"
+	}
+
+	fullPath := filepath.Join(w.vaultPath, path)
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Read existing content if file exists
+	existingContent := ""
+	if content, err := os.ReadFile(fullPath); err == nil {
+		existingContent = string(content)
+	}
+
+	// Ensure newline separation if file is not empty
+	if existingContent != "" && !strings.HasSuffix(existingContent, "\n") {
+		existingContent += "\n"
+	}
+	// Add an extra newline for separation if appending to existing content
+	if existingContent != "" {
+		existingContent += "\n"
+	}
+
+	newContent := existingContent + text + "\n"
+
+	if err := os.WriteFile(fullPath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write note: %w", err)
+	}
+
+	return nil
+}

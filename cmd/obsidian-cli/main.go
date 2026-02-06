@@ -35,6 +35,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  link <source> <target>  Link two notes\n")
 		fmt.Fprintf(os.Stderr, "  watch                   Watch vault for changes and auto-index\n")
 		fmt.Fprintf(os.Stderr, "  index                   Bulk index all notes\n")
+		fmt.Fprintf(os.Stderr, "  append <file> <text>    Append text to a note\n")
 	}
 	flag.Parse()
 
@@ -91,6 +92,8 @@ func main() {
 		cmdErr = commands.RunWatch(deps, cmdArgs)
 	case "index":
 		cmdErr = commands.RunIndex(deps, cmdArgs)
+	case "append":
+		cmdErr = commands.RunAppend(deps, cmdArgs)
 	default:
 		fatal(*jsonOutput, "Unknown command: %s", cmd)
 	}
