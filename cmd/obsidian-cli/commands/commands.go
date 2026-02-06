@@ -417,3 +417,25 @@ func RunIndex(deps *Dependencies, args []string) error {
 	fmt.Printf("✨ Bulk indexing complete. Indexed %d notes.\n", count)
 	return nil
 }
+
+// RunAppend implements Append Command
+func RunAppend(deps *Dependencies, args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: append <filename> <text>")
+	}
+	filename := args[0]
+	// Join remaining args as text, preserving spaces
+	text := strings.Join(args[1:], " ")
+
+	writer := vault.NewWriter(deps.VaultPath)
+	if err := writer.AppendToNote(filename, text); err != nil {
+		return err
+	}
+
+	if deps.JsonOutput {
+		printJson(map[string]string{"status": "appended", "file": filename})
+	} else {
+		fmt.Printf("✓ Appended to '%s'\n", filename)
+	}
+	return nil
+}
