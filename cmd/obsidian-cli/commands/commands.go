@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"obsidian-agent/internal/gardener"
 	"obsidian-agent/internal/llm"
 	"obsidian-agent/internal/vault"
 	"obsidian-agent/internal/vectorstore"
@@ -198,4 +199,80 @@ func printJson(v interface{}) {
 func getEnvInt(key string, defaultVal int) int {
 	// simplified
 	return defaultVal
+}
+
+// RunOrphans implements US-003: List orphan notes
+func RunOrphans(deps *Dependencies, args []string) error {
+	finder := gardener.NewOrphanFinder(deps.VaultPath)
+	orphans, err := finder.FindOrphans()
+	if err != nil {
+		return err
+	}
+
+	if deps.JsonOutput {
+		printJson(orphans)
+	} else {
+		for _, note := range orphans {
+			fmt.Println(note)
+		}
+	}
+	return nil
+}
+
+// RunStats implements US-003: Vault statistics
+func RunStats(deps *Dependencies, args []string) error {
+	finder := gardener.NewOrphanFinder(deps.VaultPath)
+	stats, err := finder.GetLinkStats()
+	if err != nil {
+		return err
+	}
+
+	if deps.JsonOutput {
+		printJson(stats)
+	} else {
+		fmt.Printf("Total Notes: %d\n", stats["total_notes"])
+		fmt.Printf("Orphans:     %d\n", stats["orphans"])
+		fmt.Printf("Dead Ends:   %d\n", stats["dead_ends"])
+		fmt.Printf("Well Linked: %d\n", stats["well_linked"])
+	}
+	return nil
+}
+
+// RunTags implements US-003: List all tags
+func RunTags(deps *Dependencies, args []string) error {
+	reader := vault.NewReader(deps.VaultPath)
+	tags, err := reader.ListTags()
+	if err != nil {
+		return err
+	}
+
+	if deps.JsonOutput {
+		printJson(tags)
+	} else {
+		for _, tag := range tags {
+			fmt.Println(tag)
+		}
+	}
+	return nil
+}
+
+// RunLink implements US-003: Create a wikilink
+func RunLink(deps *Dependencies, args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: link <source> <target>")
+	}
+	source := args[0]
+	target := args[1]
+
+	writer := vault.NewWriter(deps.VaultPath)
+	if err := writer.LinkNotes(source, target); err != nil {
+		return err
+	}
+
+	if deps.JsonOutput {
+		printJson(map[string]string{"status": "linked", "source": source, "target": target})
+	} else {
+		fmt.Printf("Linked '%s' to '%s'\n", source, target)
+	}
+	return nil
 }

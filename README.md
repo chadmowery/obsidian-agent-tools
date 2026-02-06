@@ -390,3 +390,6 @@ MIT License - See [LICENSE](LICENSE) for details.
 ## Contributing
 
 Contributions welcome! Please open an issue or submit a PR.
+
+## Related
+- [[NewLink]]

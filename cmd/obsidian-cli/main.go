@@ -29,7 +29,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  ask <question>          Ask a question about your notes (RAG)\n")
 		fmt.Fprintf(os.Stderr, "  read <file>             Read a note\n")
 		fmt.Fprintf(os.Stderr, "  create <path>           Create a note\n")
-		// Add other commands from US-001 as we implement them or if we are just stubbing
+		fmt.Fprintf(os.Stderr, "  orphans                 List notes with no links\n")
+		fmt.Fprintf(os.Stderr, "  tags                    List all tags\n")
+		fmt.Fprintf(os.Stderr, "  stats                   Show vault statistics\n")
+		fmt.Fprintf(os.Stderr, "  link <source> <target>  Link two notes\n")
 	}
 	flag.Parse()
 
@@ -74,6 +77,14 @@ func main() {
 		cmdErr = commands.RunRead(deps, cmdArgs)
 	case "create": // Recovery of US-001
 		cmdErr = commands.RunCreate(deps, cmdArgs)
+	case "orphans":
+		cmdErr = commands.RunOrphans(deps, cmdArgs)
+	case "tags":
+		cmdErr = commands.RunTags(deps, cmdArgs)
+	case "stats":
+		cmdErr = commands.RunStats(deps, cmdArgs)
+	case "link":
+		cmdErr = commands.RunLink(deps, cmdArgs)
 	default:
 		fatal(*jsonOutput, "Unknown command: %s", cmd)
 	}
