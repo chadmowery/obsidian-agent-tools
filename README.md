@@ -1,11 +1,11 @@
-# Obsidian Agent
+# Obsidian Agent Tools
 
 A powerful, privacy-first AI agent for your Obsidian vault.
 
-Obsidian Agent connects your personal knowledge base to AI workflows. It provides a CLI for managing your notes and an MCP (Model Context Protocol) server to let agents like Claude and Gemini read, write, and reason about your Obsidian vault.
+Obsidian Agent Tools connects your personal knowledge base to AI workflows. It provides a CLI for managing your notes and an MCP (Model Context Protocol) server to let agents like Claude and Gemini read, write, and reason about your Obsidian vault.
 
-![License](https://img.shields.io/github/license/chadmowery/obsidian-agent)
-![Go Version](https://img.shields.io/github/go-mod/go-version/chadmowery/obsidian-agent)
+![License](https://img.shields.io/github/license/chadmowery/obsidian-agent-tools)
+![Go Version](https://img.shields.io/github/go-mod/go-version/chadmowery/obsidian-agent-tools)
 
 ## Features
 
@@ -26,8 +26,8 @@ Obsidian Agent connects your personal knowledge base to AI workflows. It provide
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/chadmowery/obsidian-agent.git
-    cd obsidian-agent
+    git clone https://github.com/chadmowery/obsidian-agent-tools.git
+    cd obsidian-agent-tools
     ```
 
 2.  **Configure your environment:**
@@ -102,7 +102,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```mermaid
 graph TD
-    Client["AI Client / CLI"] <-->|MCP Protocol| Server["Obsidian Agent"]
+    Client["AI Client / CLI"] <-->|MCP Protocol| Server["Obsidian Agent Tools"]
     
     subgraph "Local Infrastructure"
         Server <-->|Embeddings| Ollama["Ollama (Local LLM)"]
@@ -112,6 +112,11 @@ graph TD
 ```
 
 The system is designed for privacy and local-first operation. All embeddings are generated locally using Ollama, and vector data is stored in a local Qdrant instance managed via Docker.
+
+## Documentation
+
+- [Developer Guide](docs/dev/AGENTS.md): Protocols and patterns for contributors.
+- [Lessons Learned](docs/dev/LESSONS.md): Technical decisions and architectural notes.
 
 ## License
 

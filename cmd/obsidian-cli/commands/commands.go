@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/chadmowery/obsidian-agent/internal/gardener"
-	"github.com/chadmowery/obsidian-agent/internal/llm"
-	"github.com/chadmowery/obsidian-agent/internal/vault"
-	"github.com/chadmowery/obsidian-agent/internal/vectorstore"
-	"github.com/chadmowery/obsidian-agent/internal/watcher"
+	"github.com/chadmowery/obsidian-agent-tools/internal/gardener"
+	"github.com/chadmowery/obsidian-agent-tools/internal/llm"
+	"github.com/chadmowery/obsidian-agent-tools/internal/vault"
+	"github.com/chadmowery/obsidian-agent-tools/internal/vectorstore"
+	"github.com/chadmowery/obsidian-agent-tools/internal/watcher"
 )
 
 type Dependencies struct {

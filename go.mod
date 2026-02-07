@@ -1,4 +1,4 @@
-module github.com/chadmowery/obsidian-agent
+module github.com/chadmowery/obsidian-agent-tools
 
 go 1.25.5
 
