@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"obsidian-agent/internal/gardener"
-	"obsidian-agent/internal/llm"
-	"obsidian-agent/internal/vault"
-	"obsidian-agent/internal/vectorstore"
-	"obsidian-agent/internal/watcher"
+	"github.com/chadmowery/obsidian-agent/internal/gardener"
+	"github.com/chadmowery/obsidian-agent/internal/llm"
+	"github.com/chadmowery/obsidian-agent/internal/vault"
+	"github.com/chadmowery/obsidian-agent/internal/vectorstore"
+	"github.com/chadmowery/obsidian-agent/internal/watcher"
 )
 
 type Dependencies struct {

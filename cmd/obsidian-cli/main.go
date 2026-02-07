@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"obsidian-agent/cmd/obsidian-cli/commands"
+	"github.com/chadmowery/obsidian-agent/cmd/obsidian-cli/commands"
 
 	"github.com/joho/godotenv"
 )

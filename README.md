@@ -1,5 +1,58 @@
 # Obsidian Agent
 
+A collection of tools to enhance your Obsidian workflow, including a CLI for managing your vault and an MCP server for AI integration.
+
+## Installation
+
+You can install the `obsidian-cli` tool globally using Go:
+
+```bash
+go install github.com/chadmowery/obsidian-agent/cmd/obsidian-cli@latest
+```
+
+Ensure that your `$(go env GOPATH)/bin` is in your system `PATH`. You can add this line to your `~/.zshrc`:
+
+```bash
+echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### Configuration
+
+To avoid passing the `--vault` flag with every command, you can set the `OBSIDIAN_VAULT_PATH` environment variable:
+
+```bash
+echo 'export OBSIDIAN_VAULT_PATH=/path/to/your/vault' >> ~/.zshrc
+source ~/.zshrc
+```
+
+The CLI looks for the vault path in this order:
+1. `--vault` flag
+2. `OBSIDIAN_VAULT_PATH` environment variable
+3. `.env` file in the current directory
+
+Alternatively, you can clone the repository and build it locally:
+
+```bash
+git clone https://github.com/chadmowery/obsidian-agent.git
+cd obsidian-agent
+make install
+```
+
+## Tools
+
+### obsidian-cli
+
+A command-line interface for your Obsidian vault.
+
+```bash
+obsidian-cli --help
+```
+
+### obsidian-mcp
+
+An MCP server...
+
 A lightweight Model Context Protocol (MCP) server that connects your AI agents to your Obsidian vault. Designed to run on low-power hardware like a Raspberry Pi Zero.
 
 ## Features
