@@ -102,12 +102,12 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```mermaid
 graph TD
-    Client[AI Client / CLI] <-->|MCP Protocol| Server[Obsidian Agent]
+    Client["AI Client / CLI"] <-->|MCP Protocol| Server["Obsidian Agent"]
     
     subgraph "Local Infrastructure"
-        Server <-->|Embeddings| Ollama[Ollama (Local LLM)]
-        Server <-->|Vectors| Qdrant[Qdrant (Vector DB)]
-        Server <-->|Read/Write| Vault[Obsidian Vault (Files)]
+        Server <-->|Embeddings| Ollama["Ollama (Local LLM)"]
+        Server <-->|Vectors| Qdrant["Qdrant (Vector DB)"]
+        Server <-->|Read/Write| Vault["Obsidian Vault (Files)"]
     end
 ```
 
