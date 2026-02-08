@@ -14,6 +14,7 @@
 bin/
 dist/
 tmp/
+docs/
 
 # OS
 .DS_Store
